@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Local Claude Code settings (personal, not shared)
+.claude/settings.local.json
+
+# Arduino / PlatformIO build artifacts
+.pio/
+*.hex
+*.bin
+build/
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

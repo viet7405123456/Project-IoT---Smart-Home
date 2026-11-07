@@ -1,0 +1,6 @@
+# Extra dependencies for RECOGNITION_MODE = "asl_alphabet" in config.py.
+# Install only if you want ASL letter recognition (heavy, ~1-2GB download):
+#   pip install -r requirements.txt -r requirements-asl.txt
+torch
+transformers
+pillow
