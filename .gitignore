@@ -26,3 +26,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Large dataset archives (not part of this repo)
+*.zip

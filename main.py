@@ -1,5 +1,6 @@
-"""Reads the camera (webcam or ESP32-CAM, per config.py), recognizes hand
-gestures and sends the corresponding command to the relay controller.
+"""Reads the camera (webcam or ESP32-CAM, per config.py), recognizes ASL
+letters with the self-trained landmark classifier, and sends the
+corresponding command to the relay controller.
 
 Run:
     python main.py
@@ -38,7 +39,7 @@ def main():
                 continue
 
             frame = recognizer.process(frame)
-            cv2.imshow("Sign Language Smart Home Control", frame)
+            cv2.imshow("ASL Landmark Smart Home Control", frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break

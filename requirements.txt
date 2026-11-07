@@ -1,0 +1,15 @@
+# Uses mediapipe.tasks.vision.HandLandmarker (new Tasks API), the same one
+# used to extract landmarks for training (../training/asl_landmark/). No
+# numpy/opencv version pins needed here: unlike ai/sign_recognition/, this
+# project doesn't depend on the legacy mp.solutions.hands API, so it isn't
+# constrained to mediapipe==0.10.21 or numpy<2. Pinned to a version
+# confirmed to still have HandLandmarker (verified locally).
+mediapipe==0.10.35
+opencv-python
+numpy
+requests
+flask
+# No scikit-learn/joblib needed: landmark_classifier.py loads plain numpy
+# weights (.npz) and runs the MLP forward pass by hand — see its docstring
+# for why (numpy major-version pickle incompatibility with the Kaggle
+# training environment).

@@ -52,11 +52,7 @@ class DeviceController:
 
 
 class MockDeviceController:
-    """Simulates the relay controller: no network calls, just local state.
-
-    Use this while the ESP32 control board isn't wired up yet. Swap for
-    DeviceController once it is, without changing main.py.
-    """
+    """Simulates the relay controller: no network calls, just local state."""
 
     def __init__(self):
         self.state = {"light": "off", "fan": "off", "door": "locked"}

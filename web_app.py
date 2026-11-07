@@ -1,6 +1,6 @@
-"""Simple local web UI to test gesture/ASL recognition in a browser instead
-of an OpenCV window. Opens the same camera source as main.py (per config.py)
-server-side and streams the processed video over HTTP.
+"""Simple local web UI to test the ASL landmark recognizer in a browser
+instead of an OpenCV window. Opens the same camera source as main.py (per
+config.py) server-side and streams the processed video over HTTP.
 
 Run:
     python web_app.py
@@ -30,7 +30,7 @@ INDEX_HTML = """
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<title>Sign Language Smart Home - Test</title>
+<title>ASL Landmark Smart Home - Test</title>
 <style>
   body {
     background: #111418;
@@ -52,8 +52,8 @@ INDEX_HTML = """
 </style>
 </head>
 <body>
-  <h1>Sign Language Smart Home — Test nhận diện</h1>
-  <p class="mode">Mode hiện tại: <b>{{ mode }}</b> (đổi trong config.py)</p>
+  <h1>ASL Landmark Smart Home — Test nhận diện</h1>
+  <p class="mode">Model tự train trên landmark MediaPipe (MLP, xem ../training/asl_landmark/)</p>
   <img src="/video_feed" alt="video stream">
 </body>
 </html>
@@ -79,7 +79,7 @@ def generate_frames():
 
 @app.route("/")
 def index():
-    return render_template_string(INDEX_HTML, mode=config.RECOGNITION_MODE)
+    return render_template_string(INDEX_HTML)
 
 
 @app.route("/video_feed")
@@ -91,4 +91,4 @@ if __name__ == "__main__":
     if not cap.isOpened():
         print(f"Could not open video source: {VIDEO_SOURCE}")
     else:
-        app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+        app.run(host="0.0.0.0", port=5001, debug=False, threaded=True)
