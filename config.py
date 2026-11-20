@@ -15,26 +15,33 @@ USE_MOCK_CONTROLLER = True
 # Only used when USE_MOCK_CONTROLLER is False.
 ESP32_CONTROL_BASE_URL = "http://192.168.1.51"
 
-# Path to the trained model weights (see models/, trained in
-# ../training/asl_landmark/ on Kaggle). Stored as plain numpy arrays (.npz),
+# Path to the trained classifier weights (see models/, trained on ASL-HG in
+# ../training/asl_landmark/experiments/). Stored as plain numpy arrays (.npz),
 # not a pickled scikit-learn estimator — see landmark_classifier.py for why.
-LANDMARK_MODEL_PATH = "models/asl_landmark_mlp_weights.npz"
+# The deployed model is multinomial logistic regression (63 -> 26). In
+# leave-one-signer-out evaluation on ASL-HG it was more accurate on unseen
+# signers than the earlier MLP (93.8% vs 91.6%) and less over-confident
+# when wrong, so the confidence threshold below rejects more of its errors.
+# landmark_classifier.py can also load an MLP .npz (detected automatically).
+# Override without editing this file:  set ASL_MODEL_PATH=models/...npz
+import os
+LANDMARK_MODEL_PATH = os.environ.get("ASL_MODEL_PATH", "models/asl_landmark_logreg_weights.npz")
 
 # Path to the MediaPipe HandLandmarker model bundle. MUST be the same API
 # family used during training (mediapipe.tasks.vision.HandLandmarker, not
 # the legacy mp.solutions.hands) — the two produce slightly different
 # landmark coordinates for the same image, and using the wrong one at
-# inference time measurably hurts accuracy (verified: 1/3 wrong on real
+# inference time measurably hurts accuracy (verified: 2/3 wrong on real
 # samples with solutions.hands vs 3/3 correct with HandLandmarker).
 HAND_LANDMARKER_MODEL_PATH = "models/hand_landmarker.task"
 
-# Ignore predictions below this confidence. Validation-set accuracy was 99%
-# (see ../training/asl_landmark/DATASET_LOG.md), but that was measured on
-# dataset images, not webcam frames, so this still guards against low-
-# confidence predictions once real webcam domain shift comes into play.
+# Ignore predictions below this confidence. On unseen ASL-HG signers this
+# threshold rejects about half of the logistic regression's errors while
+# discarding about 4% of its correct predictions (per image). Webcam frames
+# differ from dataset images, so this is a guard, not a guarantee.
 LANDMARK_CONFIDENCE_THRESHOLD = 0.6
 
-# This classifier is lightweight (small MLP on 63 numbers), so it runs every
+# This classifier is lightweight (a linear model on 63 numbers), so it runs every
 # frame — this is how many consecutive frames must agree before a command is
 # sent, to avoid accidental triggers from a hand passing through the frame.
 LANDMARK_STABLE_FRAMES = 8

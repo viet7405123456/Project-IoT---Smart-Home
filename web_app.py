@@ -53,7 +53,7 @@ INDEX_HTML = """
 </head>
 <body>
   <h1>ASL Landmark Smart Home — Test nhận diện</h1>
-  <p class="mode">Model tự train trên landmark MediaPipe (MLP, xem ../training/asl_landmark/)</p>
+  <p class="mode">Model tự train trên landmark MediaPipe (Logistic Regression, train trên ASL-HG)</p>
   <img src="/video_feed" alt="video stream">
 </body>
 </html>

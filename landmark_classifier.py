@@ -1,47 +1,51 @@
-"""ASL letter classifier trained on MediaPipe hand landmarks (MLP, trained
-on Kaggle — see ../training/asl_landmark/).
+"""ASL letter classifier on MediaPipe hand landmarks (trained on ASL-HG, see
+../training/asl_landmark/experiments/).
 
-Loads raw weights from a .npz file and runs the MLP forward pass by hand in
-numpy, rather than unpickling the scikit-learn estimator directly. This is
-deliberate: the model was trained on Kaggle with numpy>=2, but this project's
-mediapipe==0.10.21 pin requires numpy<2 (see requirements.txt — the same
-pin finger-count/SigLIP recognition needs, since mediapipe>=0.10.30 removed
-the `solutions.hands` API this project relies on). Unpickling a scikit-learn
-model saved under one major numpy version and loaded under a different one
-raises `ValueError: ... MT19937 is not a known BitGenerator`. Plain numpy
-arrays in an .npz file have no such version coupling. The forward pass below
-was verified to match the original model's predict_proba() exactly (max abs
-diff 0.0) on real sample images before switching to it.
+Loads raw weights from a .npz file and runs the forward pass by hand in
+numpy, rather than unpickling a scikit-learn estimator. Pickled estimators
+are tied to the numpy/scikit-learn versions they were saved with (loading
+across numpy major versions raised `MT19937 is not a known BitGenerator`),
+and the app would also need scikit-learn installed. Plain arrays have no such
+coupling.
+
+Two model kinds are supported; the kind is detected from the arrays present:
+  - MLP (W0,b0,W1,b1,W2,b2): relu, relu, softmax — matches
+    sklearn MLPClassifier.predict_proba.
+  - Logistic regression (W,b): softmax(x W + b) — matches multinomial
+    sklearn LogisticRegression.predict_proba.
+Both exports were checked against predict_proba (max abs diff ~1e-7).
 """
 
 import numpy as np
 
-_weights = None
-_classes = None
+_cache = {}
 
 CANONICAL_HANDEDNESS = "Right"
 
 
 def _load_weights(weights_path):
-    global _weights, _classes
-    if _weights is None:
+    if weights_path not in _cache:
         print(f"Loading landmark classifier weights from '{weights_path}'...")
         data = np.load(weights_path, allow_pickle=True)
-        _weights = {
-            "W0": data["W0"], "b0": data["b0"],
-            "W1": data["W1"], "b1": data["b1"],
-            "W2": data["W2"], "b2": data["b2"],
-        }
-        _classes = data["classes"]
-    return _weights, _classes
+        if "W0" in data:
+            kind = "mlp"
+            weights = {k: data[k] for k in ("W0", "b0", "W1", "b1", "W2", "b2")}
+        elif "W" in data:
+            kind = "logreg"
+            weights = {"W": data["W"], "b": data["b"]}
+        else:
+            raise ValueError(f"Unknown weights format in {weights_path}: {list(data.keys())}")
+        print(f"  model kind: {kind}")
+        _cache[weights_path] = (kind, weights, data["classes"])
+    return _cache[weights_path]
 
 
 def normalize_landmarks(landmarks, handedness_label):
     """landmarks: 21 MediaPipe landmark objects (.x, .y, .z).
-    MUST stay in sync with ../training/asl_landmark/train_on_kaggle.py's
-    normalize_landmarks — this is the exact preprocessing the model was
-    trained on (mirror left hand to canonical right-hand orientation,
-    translate to wrist origin, scale by hand size).
+    MUST stay identical to the preprocessing used for training
+    (../training/asl_landmark/experiments/loso_on_kaggle.py): mirror the
+    left hand to a right-hand orientation, translate to the wrist, scale by
+    the wrist-to-middle-MCP distance.
     """
     pts = np.array([[lm.x, lm.y, lm.z] for lm in landmarks], dtype=np.float32)
     if handedness_label != CANONICAL_HANDEDNESS:
@@ -59,22 +63,19 @@ def _softmax(x):
     return e / np.sum(e, axis=-1, keepdims=True)
 
 
-def _forward(feat, weights):
-    """feat: (1, 63) float array. Mirrors sklearn MLPClassifier's forward
-    pass: relu hidden layers, softmax output (verified to match exactly)."""
-    h = np.maximum(0, feat @ weights["W0"] + weights["b0"])
-    h = np.maximum(0, h @ weights["W1"] + weights["b1"])
-    logits = h @ weights["W2"] + weights["b2"]
-    return _softmax(logits)
+def predict_proba(feat, kind, weights):
+    """feat: (n, 63) float array -> (n, n_classes) probabilities."""
+    if kind == "mlp":
+        h = np.maximum(0, feat @ weights["W0"] + weights["b0"])
+        h = np.maximum(0, h @ weights["W1"] + weights["b1"])
+        return _softmax(h @ weights["W2"] + weights["b2"])
+    return _softmax(feat @ weights["W"] + weights["b"])
 
 
 def classify(landmarks, handedness_label, weights_path):
     """Returns (letter, confidence), e.g. ('L', 0.97)."""
-    weights, classes = _load_weights(weights_path)
-
+    kind, weights, classes = _load_weights(weights_path)
     feat = normalize_landmarks(landmarks, handedness_label).astype(np.float64).reshape(1, -1)
-    probs = _forward(feat, weights)[0]
+    probs = predict_proba(feat, kind, weights)[0]
     best_idx = int(np.argmax(probs))
-    confidence = float(probs[best_idx])
-    letter = str(classes[best_idx])
-    return letter, confidence
+    return str(classes[best_idx]), float(probs[best_idx])

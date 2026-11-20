@@ -7,26 +7,31 @@ pretrained của bên thứ ba cho bước phân loại).
 ## Kiến trúc
 
 ```
-Webcam --> MediaPipe HandLandmarker (landmark tay) --> MLP tự train (A-Z) --> Lệnh HTTP --> ESP32 relay
+Webcam --> MediaPipe HandLandmarker (landmark tay) --> Logistic Regression tự train (A-Z) --> Lệnh HTTP --> ESP32 relay
 ```
 
 - **MediaPipe HandLandmarker**: phát hiện tay, trả về 21 điểm landmark —
   dùng model có sẵn (pretrained) của Google, không tự train lại phần này.
-- **MLP tự train**: nhận 21 điểm landmark làm input (63 chiều: x,y,z mỗi
-  điểm), phân loại ra 1 trong 26 chữ cái. Đây là phần model do project tự
-  huấn luyện.
+- **Logistic Regression tự train**: nhận 21 điểm landmark làm input (63 chiều:
+  x,y,z mỗi điểm), phân loại ra 1 trong 26 chữ cái. Train trên dataset ASL-HG
+  (10 người làm ký hiệu). Đây là phần model do project tự huấn luyện.
 
 ## Vì sao chọn cách này
 
-- Model là mạng MLP nhỏ (63 → 128 → 64 → 26), nhận input là landmark tay
-  (đã được MediaPipe trích sẵn) thay vì ảnh pixel thô — nhẹ, không cần GPU,
-  chạy được mỗi khung hình (không cần kỹ thuật bỏ qua khung hình).
+- Model là Logistic Regression (một ma trận 63 × 26, file 14 KB), nhận input
+  là landmark tay (đã được MediaPipe trích sẵn) thay vì ảnh pixel thô — rất
+  nhẹ, không cần GPU, chạy được mỗi khung hình.
+- Vì sao không dùng MLP: khi đánh giá leave-one-signer-out (test trên người
+  chưa từng có trong dữ liệu train), Logistic Regression đúng 93.8% so với
+  91.6% của MLP (63 → 128 → 64 → 26), và khi đoán sai thì ít "tự tin" hơn, nên
+  ngưỡng tin cậy 0.6 chặn được khoảng một nửa số lỗi (MLP: khoảng 13%).
+  SVM đạt tương đương (94.0%) nhưng file 5.6 MB và cần cài scikit-learn.
 - Model được lưu dưới dạng **trọng số numpy thuần (`.npz`)**, không phải
   object scikit-learn pickle — tránh được lỗi tương thích version numpy
   giữa môi trường train (Kaggle) và môi trường chạy thật. `landmark_classifier.py`
-  tự tính forward pass (ma trận nhân + ReLU + softmax) bằng numpy — đã kiểm
-  chứng cho kết quả giống hệt scikit-learn gốc (sai số tuyệt đối = 0.0)
-  trên ảnh thật trước khi dùng cách này.
+  tự tính xác suất (nhân ma trận + softmax) bằng numpy — đã kiểm chứng cho
+  kết quả giống hệt `predict_proba` của scikit-learn. File này cũng đọc được
+  trọng số MLP (tự nhận dạng loại model từ file .npz).
 
 ## Cài đặt & chạy
 
@@ -98,12 +103,12 @@ ESP32 cần chạy firmware tự xử lý các endpoint trên (bật/tắt relay
 ```
 config.py              # cấu hình camera/thiết bị/ngưỡng tin cậy/mapping lệnh
 device_controller.py   # gửi lệnh HTTP tới ESP32, hoặc giả lập (mock)
-landmark_classifier.py # load trọng số .npz, tự tính forward pass MLP bằng numpy
+landmark_classifier.py # load trọng số .npz, tự tính xác suất bằng numpy
 recognizer.py           # vòng lặp xử lý từng khung hình, debounce, gửi lệnh
 main.py                 # chạy bằng cửa sổ OpenCV
 web_app.py               # chạy bằng giao diện web (Flask, cổng 5001)
 models/
-  asl_landmark_mlp_weights.npz  # trọng số MLP đã train
+  asl_landmark_logreg_weights.npz  # trọng số Logistic Regression đã train
   hand_landmarker.task           # model MediaPipe HandLandmarker
 requirements.txt
 ```
